@@ -153,9 +153,9 @@ pub fn rros_net_transmit(mut skb: &mut RrosSkBuff) -> Result<()> {
     if !skb.is_oob() {
         return Err(Error::EINVAL);
     }
-    // if dev.is_oob_capable(){
-    //     return xmit_oob()
-    // }
+    if dev.is_oob_capable(){
+        return xmit_oob()
+    }
 
     if kernel::premmpt::running_inband().is_ok() {
         uncharge_socke_wmem(&mut skb);
