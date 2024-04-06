@@ -23,75 +23,75 @@ static mut OOB_XMIT_WORK: IrqWork = unsafe {
     )
 };
 
-// fn oob_start_xmit(dev: *mut bindings::net_device, skb: *mut bindings::sk_buff) -> i32 {
-//     unsafe{
-//         (*(*dev).netdev_ops).ndo_start_xmit.unwrap()(skb, dev)
-//     }
-// }
+fn oob_start_xmit(dev: *mut bindings::net_device, skb: *mut bindings::sk_buff) -> i32 {
+    unsafe{
+        (*(*dev).netdev_ops).ndo_start_xmit.unwrap()(skb, dev)
+    }
+}
 
-// fn do_tx(qdisc: *mut RROSNetQdisc,dev:*mut bindings::net_device,skb:*mut bindings::sk_buff) {
-//     rros_unchange_socket_wmem(skb);  //TODO:
-//     let result = oob_start_xmit(dev, skb);
-//     match result{
-//         bindings::netdev_tx_NETDEV_TX_OK => {},
-//         _ => {// busy, or whatever
-//             unsafe{
-//                 (*qdisc).pack_dropped += 1;
-//             }
-//             rros_net_free_skb(skb); //TODO:
-//         }
-//     }
-// }
+fn do_tx(qdisc: *mut RROSNetQdisc,dev:*mut bindings::net_device,skb:*mut bindings::sk_buff) {
+    rros_unchange_socket_wmem(skb);  //TODO:
+    let result = oob_start_xmit(dev, skb);
+    match result{
+        bindings::netdev_tx_NETDEV_TX_OK => {},
+        _ => {// busy, or whatever
+            unsafe{
+                (*qdisc).pack_dropped += 1;
+            }
+            rros_net_free_skb(skb); //TODO:
+        }
+    }
+}
 
-// fn rros_net_do_tx(arg: *mut c_void){
-//     extern "C"{
-//         fn rust_helper_list_del_init(list: *mut bindings::list_head);
-//     }
-//     let list = bindings::list_head::default();
-//     init_as_list_head!(list);
-//     let dev = unsafe{
-//         arg as *mut bindings::net_device
-//     };
-//     let est = unsafe{
-//         (*dev). // TODO: estate
-//     }
-//     while !rros_kthread_should_stop(){
+fn rros_net_do_tx(arg: *mut c_void){
+    extern "C"{
+        fn rust_helper_list_del_init(list: *mut bindings::list_head);
+    }
+    let list = bindings::list_head::default();
+    init_as_list_head!(list);
+    let dev = unsafe{
+        arg as *mut bindings::net_device
+    };
+    let est = unsafe{
+        (*dev). // TODO: estate
+    }
+    while !rros_kthread_should_stop(){
 
-//         let ret = rros_wait_flag(unsafe{&(*est).flag});
-//         if ret{
-//             break;
-//         }
-//         let qdisc : *mut RROSNetQdisc = unsafe{
-//             (*est).qdisc
-//         };
-//         loop{
-//             let skb = unsafe{
-//                 (*(*qdisc).oob_ops).dequeue(qdisc)
-//             };
-//             if skb.is_null(){
-//                 break;
-//             }
-//             do_tx(qdisc,dev,skb);
-//         }
-//         let inband_q = unsafe{
-//             &(*qdisc).inband_q
-//         };
-//         if inband_q.move_queue(&list){
-//             // TODO: use macro instead
-//             let mut skb = list_first_entry!(&list,bindings::sk_buff,__bindgen_anon_1.list);
-//             let mut n = list_next_entry!(pos,bindings::sk_buff,__bindgen_anon_1.list);
-//             while !list_entry_is_head!(pos,&list,__bindgen_anon_1.list){
-//                 unsafe{
-//                     rust_helper_list_del_init(&(*skb).__bindgen_anon_1.list);
-//                 }
-//                 do_tx(qdisc, dev, skb);
-//                 // process next skb
-//                 pos = n;
-//                 n = list_next_entry!(n,bindings::sk_buff,__bindgen_anon_1.list);
-//             }
-//         }
-//     }
-// }
+        let ret = rros_wait_flag(unsafe{&(*est).flag});
+        if ret{
+            break;
+        }
+        let qdisc : *mut RROSNetQdisc = unsafe{
+            (*est).qdisc
+        };
+        loop{
+            let skb = unsafe{
+                (*(*qdisc).oob_ops).dequeue(qdisc)
+            };
+            if skb.is_null(){
+                break;
+            }
+            do_tx(qdisc,dev,skb);
+        }
+        let inband_q = unsafe{
+            &(*qdisc).inband_q
+        };
+        if inband_q.move_queue(&list){
+            // TODO: use macro instead
+            let mut skb = list_first_entry!(&list,bindings::sk_buff,__bindgen_anon_1.list);
+            let mut n = list_next_entry!(pos,bindings::sk_buff,__bindgen_anon_1.list);
+            while !list_entry_is_head!(pos,&list,__bindgen_anon_1.list){
+                unsafe{
+                    rust_helper_list_del_init(&(*skb).__bindgen_anon_1.list);
+                }
+                do_tx(qdisc, dev, skb);
+                // process next skb
+                pos = n;
+                n = list_next_entry!(n,bindings::sk_buff,__bindgen_anon_1.list);
+            }
+        }
+    }
+}
 
 // inband
 #[no_mangle]
@@ -121,19 +121,19 @@ fn skb_inband_xmit_backlog() {
     OOB_TX_RELAY.irq_unlock_noguard(flags);
 }
 
-// fn xmit_oob(dev : *mut bindings::net_device, skb : *mut bindings::sk_buff) -> i32{
-//     // TODO: est,skb_inband_xmit_backlog,rros_raise_flag
-//     let est = unsafe{
-//         let ptr  = (*dev).oob_context.dev_state.wrapper as *mut OOBNetdevState;
-//         (*ptr).estate
-//     };
-//     let ret = rros_net_sched_packet(dev,skb);
-//     if ret{
-//         ret
-//     }
-//     rros_raise_flag(&est.tx_flag);
-//     return 0;
-// }
+fn xmit_oob(dev : *mut bindings::net_device, skb : *mut bindings::sk_buff) -> i32{
+    // TODO: est,skb_inband_xmit_backlog,rros_raise_flag
+    let est = unsafe{
+        let ptr  = (*dev).oob_context.dev_state.wrapper as *mut OOBNetdevState;
+        (*ptr).estate
+    };
+    let ret = rros_net_sched_packet(dev,skb);
+    if ret{
+        ret
+    }
+    rros_raise_flag(&est.tx_flag);
+    return 0;
+}
 
 pub fn rros_net_transmit(mut skb: &mut RrosSkBuff) -> Result<()> {
     let dev = skb.dev();
